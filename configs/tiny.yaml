@@ -1,0 +1,20 @@
+# ~22M paramètres : ablations rapides sur la RTX 4060 Ti (quelques heures pour ~500M tokens)
+name: tiny
+model:
+  d_model: 384
+  n_layers: 6
+  n_heads: 6
+  n_kv_heads: 2
+  head_dim: 64
+  ffn_dim: 1024
+  max_seq_len: 1024
+train:
+  seq_len: 1024
+  global_batch_seqs: 128        # 131k tokens par step
+  micro_batch_seqs: 32
+  total_tokens: 5.0e8
+  lr: 3.0e-3
+  warmup_steps: 200
+  eval_every: 250
+  eval_tokens: 5.0e6
+  remat: false

@@ -1,0 +1,18 @@
+# Mélange de données de pré-entraînement (anglais).
+# Chaque source : dataset HF en streaming, config, split, champ texte, poids, filtre optionnel.
+# Vérifie sur huggingface.co que chaque dataset est toujours disponible avec ces noms.
+tokenizer: tokenizer/llmedith-32k/tokenizer.json
+shard_tokens: 100000000          # 100M tokens par shard (200 Mo)
+val_tokens: 10000000
+train:
+  - {name: fineweb_edu, path: HuggingFaceFW/fineweb-edu, config: sample-100BT, field: text, weight: 0.60,
+     min_score: 3}
+  - {name: dclm, path: mlfoundations/dclm-baseline-1.0-parquet, field: text, weight: 0.25}
+  - {name: code, path: codeparrot/codeparrot-clean, field: content, weight: 0.08}
+  - {name: math, path: HuggingFaceTB/finemath, config: finemath-3plus, field: text, weight: 0.07}
+anneal:
+  - {name: fineweb_edu_hq, path: HuggingFaceFW/fineweb-edu, config: sample-10BT, field: text, weight: 0.50,
+     min_score: 4}
+  - {name: math, path: HuggingFaceTB/finemath, config: finemath-4plus, field: text, weight: 0.20}
+  - {name: cosmopedia, path: HuggingFaceTB/smollm-corpus, config: cosmopedia-v2, field: text, weight: 0.20}
+  - {name: code, path: codeparrot/codeparrot-clean, field: content, weight: 0.10}

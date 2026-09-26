@@ -1,0 +1,17 @@
+# ~100M paramètres : étape intermédiaire (TPU ou 2×T4 Kaggle), comparable à GPT-2 124M
+name: small
+model:
+  d_model: 768
+  n_layers: 12
+  n_heads: 12
+  n_kv_heads: 4
+  head_dim: 64
+  ffn_dim: 2048
+  max_seq_len: 2048
+train:
+  seq_len: 2048
+  global_batch_seqs: 256        # ~0,5M tokens par step
+  micro_batch_seqs: 16
+  total_tokens: 5.0e9
+  lr: 3.0e-3
+  warmup_steps: 500

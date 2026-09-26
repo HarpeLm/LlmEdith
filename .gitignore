@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.egg-info/
+/runs/
+/shards/
+/checkpoints/
+/exports/
+/results/
+*.bin
+wandb/
