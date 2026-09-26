@@ -6,7 +6,7 @@ import json
 import os
 
 GITHUB_REPO = "https://github.com/HarpeLm/LlmEdith.git"
-HF_USER = "TON_PSEUDO_HF"
+HF_USER = "HarpePluie"
 CKPT_REPO = f"{HF_USER}/llmedith-checkpoints"   # dépôt modèle privé : checkpoints partagés
 DATA_REPO = f"{HF_USER}/llmedith-data"          # dépôt dataset privé : shards tokenisés
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,22 +94,59 @@ log[log.split == 'val'].plot(x='step', y='loss', ax=ax, style='o-', label='val')
         md("""
 # LlmEdith : PyTorch sur 2×T4 (Kaggle)
 *Accelerator* = **GPU T4 x2**, *Internet* = **ON**, secrets `HF_TOKEN` / `GITHUB_TOKEN`.
-Sert aux ablations sur config `small`/`tiny` et aux **benchmarks** des checkpoints (en parallèle de la run TPU).
+Remplace un GPU local : ablations, **benchmarks** des checkpoints de la run TPU, puis **SFT/DPO**.
 Les T4 n'ont pas de bf16 : l'entraînement passe automatiquement en fp16 + GradScaler.
 """),
         secrets_cell("kaggle"),
         code("!pip install -q -e '.[eval]'"),
-        md("## A. Ablation / pré-entraînement multi-GPU"),
-        code(f"""
-!torchrun --nproc_per_node 2 -m llmedith.torch_impl.train --config configs/small.yaml --resume \\
-    --max_minutes 500 --override data.hub_repo={DATA_REPO} train.micro_batch_seqs=8
+        md("""
+## A. Ablation `tiny` : Muon contre AdamW, un modèle par GPU, en parallèle
+Environ 3 h. Relance la cellule dans une nouvelle session si elle est coupée : chaque run reprend.
 """),
-        md("## B. Benchmarks du dernier checkpoint de la run principale"),
+        code(f"""
+import subprocess
+def run(gpu, name, opt):
+    cmd = (f"CUDA_VISIBLE_DEVICES={{gpu}} python -m llmedith.torch_impl.train --config configs/tiny.yaml "
+           f"--resume --max_minutes 480 --override name={{name}} train.optimizer={{opt}} data.hub_repo={DATA_REPO}")
+    return subprocess.Popen(cmd + f" > {{name}}.log 2>&1", shell=True)
+procs = [run(0, 'tiny_muon', 'muon'), run(1, 'tiny_adamw', 'adamw')]
+for p in procs:
+    p.wait()
+!tail -n 3 tiny_muon.log tiny_adamw.log
+"""),
+        code("""
+import pandas as pd
+cols = ['step', 'split', 'loss', 'lr', 'gnorm', 'tok_s']
+ax = None
+for name in ['tiny_muon', 'tiny_adamw']:
+    log = pd.read_csv(f'runs/{name}/log.csv', names=cols)
+    val = log[log.split == 'val']
+    ax = val.plot(x='step', y='loss', ax=ax, label=name, style='o-')
+    print(name, 'val loss finale :', val.loss.iloc[-1])
+"""),
+        md("## B. Benchmarks du dernier checkpoint de la run principale (TPU)"),
         code(f"""
 from llmedith import hub
 hub.pull_folder('{CKPT_REPO}', 'main/latest', 'runs')
 !python -m convert.to_hf --ckpt runs/main/latest --out exports/llmedith-main
 !python -m eval.run_benchmarks --models edith-main=exports/llmedith-main --baselines --force
+"""),
+        md("""
+## C. Alignement : SFT puis DPO (quand le pré-entraînement est terminé)
+Chaque étape est envoyée sur le Hub à la fin, pour pouvoir continuer dans une autre session.
+"""),
+        code(f"""
+from llmedith import hub
+hub.pull_folder('{CKPT_REPO}', 'main/latest', 'runs')
+!python -m posttrain.sft --base runs/main/latest --out runs/sft --max_examples 100000 --epochs 2
+hub.push_folder('{CKPT_REPO}', 'runs/sft/latest', 'sft/latest', blocking=True)
+"""),
+        code(f"""
+from llmedith import hub
+if not os.path.exists('runs/sft/latest/meta.json'):
+    hub.pull_folder('{CKPT_REPO}', 'sft/latest', 'runs')
+!python -m posttrain.dpo --base runs/sft/latest --out runs/dpo --max_examples 20000
+hub.push_folder('{CKPT_REPO}', 'runs/dpo/latest', 'dpo/latest', blocking=True)
 """),
     ], accelerator="nvidiaTeslaT4")
 
@@ -130,8 +167,8 @@ Idéal pour les ablations `tiny`, le SFT et pour discuter avec le modèle.
         md("## Discuter avec le modèle aligné"),
         code(f"""
 from llmedith import hub
-hub.pull_folder('{CKPT_REPO}', 'sft/latest', 'runs')
-!python -m convert.to_hf --ckpt runs/sft/latest --out exports/llmedith-chat --chat
+hub.pull_folder('{CKPT_REPO}', 'dpo/latest', 'runs')
+!python -m convert.to_hf --ckpt runs/dpo/latest --out exports/llmedith-chat --chat
 !python -m posttrain.chat exports/llmedith-chat
 """),
     ], accelerator="GPU")
