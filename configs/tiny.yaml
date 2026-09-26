@@ -11,7 +11,7 @@ model:
 train:
   seq_len: 1024
   global_batch_seqs: 128        # 131k tokens par step
-  micro_batch_seqs: 32
+  micro_batch_seqs: 8           # 8 = tient sur un Mac 16 Go ou une carte 8 Go ; monter à 32 sur un gros GPU
   total_tokens: 5.0e8
   lr: 3.0e-3
   warmup_steps: 200
