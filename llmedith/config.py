@@ -104,8 +104,11 @@ class Config:
         raw = yaml.safe_load(Path(path).read_text()) or {}
         for ov in overrides or []:
             key, val = ov.split("=", 1)
-            section, name = key.split(".", 1)
-            raw.setdefault(section, {})[name] = yaml.safe_load(val)
+            if "." in key:
+                section, name = key.split(".", 1)
+                raw.setdefault(section, {})[name] = yaml.safe_load(val)
+            else:  # clé de premier niveau, ex. name=tiny_muon
+                raw[key] = yaml.safe_load(val)
         cfg = cls(
             name=raw.get("name", Path(path).stem),
             model=_build(ModelConfig, raw.get("model", {})),
