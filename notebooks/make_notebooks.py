@@ -33,11 +33,17 @@ def secrets_cell(platform):
         get = ("from kaggle_secrets import UserSecretsClient\n"
                "s = UserSecretsClient()\n"
                "os.environ['HF_TOKEN'] = s.get_secret('HF_TOKEN')\n"
-               "GH = s.get_secret('GITHUB_TOKEN')  # seulement si le dépôt GitHub est privé")
+               "try:\n"
+               "    GH = s.get_secret('GITHUB_TOKEN')  # seulement si le dépôt GitHub est privé\n"
+               "except Exception:\n"
+               "    GH = None")
     else:
         get = ("from google.colab import userdata\n"
                "os.environ['HF_TOKEN'] = userdata.get('HF_TOKEN')\n"
-               "GH = userdata.get('GITHUB_TOKEN')  # seulement si le dépôt GitHub est privé")
+               "try:\n"
+               "    GH = userdata.get('GITHUB_TOKEN')  # seulement si le dépôt GitHub est privé\n"
+               "except Exception:\n"
+               "    GH = None")
     return code(f"""
 import os, subprocess
 {get}
@@ -56,7 +62,7 @@ def main():
         md("""
 # LlmEdith : pré-entraînement JAX sur TPU (Kaggle)
 **Réglages Kaggle** : *Accelerator* = **TPU VM v5e-8** (ou v3-8), *Internet* = **ON**.
-*Add-ons → Secrets* : `HF_TOKEN` (jeton HF en écriture), `GITHUB_TOKEN` si ton dépôt est privé.
+*Add-ons → Secrets* : `HF_TOKEN` (jeton HF en écriture), `GITHUB_TOKEN` seulement si ton dépôt est privé.
 
 Chaque session reprend automatiquement au dernier checkpoint (sauvegardé toutes les 30 min sur le Hub),
 puis s'arrête proprement avant la limite de 9 h. Il suffit de relancer le notebook chaque semaine.
